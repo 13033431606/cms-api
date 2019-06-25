@@ -6,11 +6,8 @@ header("Content-type:app/json");
 use think\View;
 use think\Db;
 use app\index\model\ArticleModel;
-use app\index\model\TypeModel;
-use think\Session;
 
-
-class Article extends Thy
+class Article extends Base
 {
 
     /**
@@ -26,6 +23,8 @@ class Article extends Thy
      * @apiSuccess (成功返回) {Number} code 状态标识码
      * @apiSuccess (成功返回) {String} message  状态信息
      * @apiSuccess (成功返回) {Number} count 文章数量
+     *
+     *
      */
     public function index()
     {
@@ -35,13 +34,19 @@ class Article extends Thy
         $total= ($page-1)*$num;
 
         if($id == 0){
-            $data["data"]= db("article")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
+            //$data["data"]= db("article")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
+            //tp自带函数助手无目标取值,所以用了原生写法;
+            $data["data"]= Db::query("select id,title,pid,img,time from thy_article limit "."$total,$num");
 
         }
         else{
-            $data["data"]= db("article")->where("id in ($id)")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
+
+            //$data["data"]= db("article")->where("pid in ($id)")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
+            //原因同上
+            $data["data"]= Db::query("select id,title,pid,img,time from thy_article where pid in (".$id.") limit "."$total,$num");
         }
 
+        //处理分类名
         foreach ($data["data"] as $key=>$value){
             $pname= db("type")->where("id =".$value['pid'])->value("name");
             $data["data"][$key]["pname"]=$pname;
@@ -52,8 +57,19 @@ class Article extends Thy
         $data['message']= "返回成功";
 
         return json($data);
-
     }
+
+
+
+    public function add(){
+        $data=$_POST["data"];
+
+
+
+        return json($data);
+    }
+
+
 
 
     public function getData(){
@@ -94,43 +110,9 @@ class Article extends Thy
     }
 
 
-    //添加文章页面
-    public function add()
-    {
-        $view=new View();
-
-        $base=new Base();
-        $tree=$base->getTree(1);
-        $view->tree=$base->genOption($tree);
-
-        return $view->fetch();
-    }
-
-    //添加文章方法
-    public function addArticle(){
-        $article = new ArticleModel;
-        //获取ajax传输的表单数据
-        $data=$_POST;
 
 
-        if($data['pid'] == ''){
-            return false;
-            exit;
-        }
 
-        if(isset($data['img1'])){
-            $this->moveFile($data['img1']);
-        }
-        if(isset($data['img2'])){
-            $this->moveFile($data['img2']);
-        }
-        if(isset($data['img3'])){
-            $this->moveFile($data['img3']);
-        }
-        $article->data($data);
-        // 过滤post数组中的非数据表字段数据
-        $article->save();
-    }
 
     //修改文章页面
     public function edit(){
