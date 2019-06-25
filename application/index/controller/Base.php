@@ -21,6 +21,7 @@ class Base
      * @apiSuccess (成功返回) {String} data 图片上传后的保存名称:"20190625\b75a7da75f420c85529729ab907720e5.jpg"
      * @apiSuccess (成功返回) {String} message 上传信息
      * @apiSuccess (成功返回) {Number} code 状态标识码
+     * @apiSuccess (成功返回) {String} location 同data,供富文本编辑器使用
      */
     public function upload(){
         $file = request()->file('file');
@@ -37,6 +38,7 @@ class Base
                 $msg['code']="200";
                 $msg['message']="上传成功";
                 $msg['data']=$info->getSaveName();
+                $msg['location']=$msg['data'];
                 return json($msg);
             }else{
                 // 上传失败获取错误信息
@@ -47,6 +49,7 @@ class Base
             }
         }
     }
+
 
 
     /**

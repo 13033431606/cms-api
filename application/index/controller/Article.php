@@ -62,7 +62,13 @@ class Article extends Base
 
 
     public function add(){
-        $data=$_POST["data"];
+        //获取整个传过来的表单文件
+        //此时相关文件内容已经入了缓存
+        $data=$_POST;
+
+        //1.遍历content中的img,放入上传区,修改src路径
+        //2.遍历img,放入上传区,修改src路径
+
 
 
 
