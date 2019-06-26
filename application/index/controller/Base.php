@@ -50,7 +50,44 @@ class Base
         }
     }
 
+    /**
+     * @api {POST} /base/del_file  文件删除(外部)
+     * @apiName del_file
+     * @apiGroup Base
+     *
+     * @apiParam {String} file_save_name 文件保存名:"20190626\6159e602f3befeccd8f83ebcd74702b3.jpg"
+     */
+    public function del_file(){
+        $file_name=$_POST['file_name'];
+        $file = ROOT_PATH . 'public/uploads/temp/' . $file_name;
+        if (file_exists($file)) {
+            unlink ($file);
+        }
 
+        $file2 = ROOT_PATH . 'public/uploads/' . $file_name;
+        if (file_exists($file2)) {
+            unlink ($file2);
+        }
+    }
+
+    /**
+     * @api {POST} /base/del_file  文件删除(内部)
+     * @apiName del_file_private
+     * @apiGroup Base
+     *
+     * @apiParam {String} file_name 文件保存名:"20190626\6159e602f3befeccd8f83ebcd74702b3.jpg"
+     */
+    public function del_file_private($file_name){
+        $file = ROOT_PATH . 'public/uploads/temp/' . $file_name;
+        if (file_exists($file)) {
+            unlink ($file);
+        }
+
+        $file2 = ROOT_PATH . 'public/uploads/' . $file_name;
+        if (file_exists($file2)) {
+            unlink ($file2);
+        }
+    }
 
     /**
      * @api {get} /base/type_tree 获取树状结构
@@ -122,6 +159,23 @@ class Base
     }
 
 
+    /**
+     * @api {Method} /base/move_file  文件移动
+     * @apiName move_file
+     * @apiGroup Base
+     *
+     * @apiParam {String} file_save_name 文件保存名:"20190626\6159e602f3befeccd8f83ebcd74702b3.jpg"
+     */
+    public function move_file($file_save_name){
+        if($file_save_name){
+            $file=ROOT_PATH . 'public/uploads/temp/'.$file_save_name; //旧目录
+            $new_file=ROOT_PATH . 'public/uploads/'.$file_save_name; //新目录
+            $dir = iconv("UTF-8", "GBK", ROOT_PATH . 'public/uploads/'.substr($file_save_name,0,8));
+            if (!file_exists($dir)) mkdir ($dir,0777,true);
+            copy($file,$new_file); //拷贝到新目录
+        }
+    }
+
 
     //获取文件夹大小
     public function dir_size($dir){
@@ -188,16 +242,7 @@ class Base
     }
 
 
-    //转移图片方法
-    public function moveFile($fileSaveName){
-        if($fileSaveName){
-            $file=ROOT_PATH . 'public/uploads/temp/'.$fileSaveName; //旧目录
-            $newFile=ROOT_PATH . 'public/uploads/'.$fileSaveName; //新目录
-            $dir = iconv("UTF-8", "GBK", ROOT_PATH . 'public/uploads/'.substr($fileSaveName,0,8));
-            if (!file_exists($dir)) mkdir ($dir,0777,true);
-            copy($file,$newFile); //拷贝到新目录
-        }
-    }
+
 
     //添加文章内容图片路径
     function add_imgs_url($content){
