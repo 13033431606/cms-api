@@ -129,7 +129,7 @@ class Base
     public function type_tree(){
         $id=$_GET["id"];
 
-        $types=Db::query("select id,parent,name from thy_type where code like '%".$id."%'");
+        $types=Db::query("select id,pid,title from thy_type where code like '%".$id."%' order by sort desc,id desc");
 
         //新数组以原数组的id为索引,进行遍历
         foreach ($types as $value){
@@ -138,12 +138,12 @@ class Base
 
         foreach ($items as $key=>$value){
             //判断当前的父元素为索引的元素定义时,此元素为子元素
-            if(isset($items[$value['parent']])){
+            if(isset($items[$value['pid']])){
                 //当前元素就是父元素的子集
                 //$items[$value['parent']]['son'][],$tree[],$items[$key]
                 //三个变量用&绑在了一起,指向了同一个地址
                 //这里不用$value的原因是每个$value都有不同地址,最终三者的值为最后一个元素的值
-                $items[$value['parent']]['son'][] = &$items[$key];
+                $items[$value['pid']]['son'][] = &$items[$key];
             }else{
                 //如果已定义的话,说明是父级元素,直接push到tree
                 $tree[] = &$items[$key];
@@ -174,6 +174,61 @@ class Base
             if (!file_exists($dir)) mkdir ($dir,0777,true);
             copy($file,$new_file); //拷贝到新目录
         }
+    }
+
+
+    /**
+     * @api {METHOD} /base/del_imgs  文章图片删除(内部),删除img和content里的图片
+     * @apiName del_imgs_private
+     * @apiGroup Base
+     *
+     * @apiParam {Array} aritlle_arr select出来的文章数组,或者通过其他拼接也可以
+     */
+    public function del_imgs($aritlle_arr){
+        //遍历content数据,删除图片文件
+        $preg = '/<img.*?src=[\"|\']?(.*?)[\"|\']?\s.*?>/i';//正则获取所有图片路径
+        foreach ($aritlle_arr as $val){
+            //删除img的图片
+            if($val['img'] != ''){
+                $img_list=explode(",",$val['img']);
+                foreach ($img_list as $value){
+                    $this->del_file_private($value);
+                }
+            }
+
+            //删除content的图片
+            if($val['content'] != ''){
+                preg_match_all($preg,$val['content'],$matches);//array[0]为img集,array[1]为src集
+                //遍历所有src路径进行删除图片
+                foreach ($matches[1] as $value){
+                    //首先判断是否有匹配的文件
+                    //是删除现有的id,所以路径不可能有temp,所以直接取uploads
+                    $filename=substr(strrchr($value,"uploads"),8); //数组凭接获取:20190626\6159e602f3befeccd8f83ebcd74702b3.jpg
+                    $this->del_file_private($filename);
+                }
+            }
+
+        }
+    }
+
+
+    /**
+     * @api {METHOD} /base/get_type_id 获取子类别ID和自身
+     * @apiName get_type_id
+     * @apiGroup Base
+     *
+     * @apiParam {Number} id 传入需要获取的id
+     *
+     * @apiSuccess (返回成功) {String} id字符串"15,16,12"
+     */
+    function get_type_id($id) {
+        //返回$id的子类别ID和自身
+        $pid= Db::query("select id from thy_type where code like '%,".$id.",%'");
+        $nums = '';
+        foreach ($pid as $v) {
+            $nums .= $v['id'] . ',';
+        }
+        return rtrim($nums, ',');
     }
 
 

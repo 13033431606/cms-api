@@ -3,9 +3,8 @@ namespace app\index\controller;
 
 header('Access-Control-Allow-Origin:*');
 header("Content-type:app/json");
-use think\View;
+
 use think\Db;
-use app\index\model\ArticleModel;
 
 class Article extends Base
 {
@@ -46,7 +45,7 @@ class Article extends Base
 
         //基于pid查询分类名
         foreach ($data["data"] as $key=>$value){
-            $pname= db("type")->where("id =".$value['pid'])->value("name");
+            $pname= db("type")->where("id =".$value['pid'])->value("title");
             $data["data"][$key]["pname"]=$pname;
         }
 
@@ -71,6 +70,8 @@ class Article extends Base
      * @apiParam {String{0..350}} keywords 描述
      * @apiParam {String="text"} content 文章内容
      * @apiParam {Number} click 点击量
+     * @apiParam {Number{0-9999}} sort 排序(desc)
+     * @apiParam {String} state 状态(on:off),显示:隐藏
      *
      * @apiSuccess (成功添加) {Number} insert_id 自增id
      * @apiSuccess (成功添加) {Number} code 状态标识码
@@ -82,7 +83,7 @@ class Article extends Base
      */
     public function add(){
         //获取整个传过来的表单文件
-        //此时相关文件内容已经入了缓存
+        //此时相关文件图片内容已经入了缓存
         $data=$_POST;
 
         //处理img
@@ -158,30 +159,7 @@ class Article extends Base
 
         $temp=db('article')->where("id in ($id)")->select();//返回删除的文章列表
 
-        //遍历content数据,删除图片文件
-        $preg = '/<img.*?src=[\"|\']?(.*?)[\"|\']?\s.*?>/i';//正则获取所有图片路径
-        foreach ($temp as $val){
-            //删除img的图片
-            if($val['img'] != ''){
-                $img_list=explode(",",$val['img']);
-                foreach ($img_list as $value){
-                    parent::del_file_private($value);
-                }
-            }
-
-            //删除content的图片
-            if($val['content'] != ''){
-                preg_match_all($preg,$val['content'],$matches);//array[0]为img集,array[1]为src集
-                //遍历所有src路径进行删除图片
-                foreach ($matches[1] as $value){
-                    //首先判断是否有匹配的文件
-                    //是删除现有的id,所以路径不可能有temp,所以直接取uploads
-                    $filename=substr(strrchr($value,"uploads"),8); //数组凭接获取:20190626\6159e602f3befeccd8f83ebcd74702b3.jpg
-                    parent::del_file_private($filename);
-                }
-            }
-
-        }
+        parent::del_imgs($temp);
 
         $data['count']=db('article')->where("id in ($id)")->delete();//返回删除的数目
         $data['code']="200";
@@ -213,146 +191,4 @@ class Article extends Base
         return json($data);
 
     }
-
-    public function getData(){
-        //页数
-        $page=$_REQUEST['page'];
-        //每页数
-        $limit=$_REQUEST['limit'];
-        //总数
-        $total=$page*$limit-$limit;
-
-        //获取id集
-//        $base=new Base();
-//        $ids=$base->getTypeID(13);
-
-        //获取文章信息
-        $data['data'] = db('article')->order(['order'=>'desc','id'=>'desc'])->limit("$total,$limit")->select();
-        foreach ($data['data'] as $key => $value) {
-            $pids=explode(",",$value['pid']);
-            $data['data'][$key]['cat']='';
-            if(count($pids)>1){
-                foreach ($pids as $key2=>$value2){
-                    $data['data'][$key]['cat'].=db('type')->where("`id`= $value2")->value('name')." , ";
-                }
-            }
-            else{
-                $data['data'][$key]['cat'] = db('type')->where("`id`= $pids[0] ")->value('name');
-            }
-
-        }
-
-        $data['code'] = '0';
-        $data['msg'] = "文章列表数据";
-        $data['page'] = $page;
-        $data['limit'] = $limit;
-        $data['count'] = db('article')->order(['order'=>'desc','id'=>'desc'])->count();
-
-        return json($data);
-    }
-
-
-
-
-
-
-    //修改文章页面
-    public function edit(){
-        if(isset($_GET["id"])){
-            $id=$_GET["id"];
-            $article=ArticleModel::get($id);
-
-//            $article["pname"]=TypeModel::where('id',$article['pid'])->value('name');
-
-
-            $pids=explode(",",$article['pid']);
-            $article['pname']='';
-            if(count($pids)>1){
-                foreach ($pids as $key=>$value){
-                    $article['pname'].=db('type')->where("`id`=$value")->value('name')." , ";
-                }
-            }
-            else{
-                $article['pname'] = db('type')->where("`id`=$pids[0]")->value('name');
-            }
-
-
-            $view = new View();
-
-            $base=new Base();
-
-            $tree=$base->getTree(1);
-
-            $view->tree=$base->genOption($tree);
-
-            $view->assign('list',$article);
-
-            return $view->fetch();
-        }
-    }
-
-
-    public function editArticle(){
-        $id=$_GET["id"];
-
-        $data=$_POST;
-
-        $ori=ArticleModel::get($id);
-
-        if(isset($data['img1'])){
-            if ($ori["img1"]!=$data['img1']){ //判断图片有无更改
-                $this->moveFile($data['img1']);
-            }
-        }
-        if(isset($data['img2'])){
-            if ($ori["img2"]!=$data['img2']){ //判断图片有无更改
-                $this->moveFile($data['img2']);
-            }
-        }
-        if(isset($data['img3'])){
-            if ($ori["img3"]!=$data['img3']){ //判断图片有无更改
-                $this->moveFile($data['img3']);
-            }
-        }
-
-        $article = new ArticleModel;
-        $article->allowField(true)->save($data,['id' => $id]);
-    }
-
-    //删除信息
-    public function delArticle($id_single=''){
-        if($id_single!=''){
-            $id=$id_single;
-        }
-        else{
-            $id=$_REQUEST['id'];
-        }
-        $result=db('article')->where('id',$id)->find();
-        $base=new Base();
-        if($result['img1']!=''){
-            $base->delete_img($result['img1']);
-        }
-        if($result['img2']!=''){
-            $base->delete_img($result['img2']);
-        }
-        if($result['img3']!=''){
-            $base->delete_img($result['img3']);
-        }
-        if($result['content']!=''){
-            $base->delete_imgs($result['content']);
-        }
-        $result=db('article')->where('id',$id)->delete();
-        return $result;
-    }
-
-    //批量删除
-    public function delAllArticle(){
-        $id=$_REQUEST['id'];
-        $idArr=explode(",",$id);//将传过来的ids字符串转换为数组
-        foreach ($idArr as $key2=>$value2){
-            $this->delArticle($value2);
-        }
-        return "ok";
-    }
-
 }

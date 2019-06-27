@@ -1,246 +1,186 @@
 <?php
 namespace app\index\controller;
 
-
+header('Access-Control-Allow-Origin:*');
+header("Content-type:app/json");
 use think\View;
 use think\Db;
 use app\index\model\ArticleModel;
 use app\index\model\TypeModel;
-use think\Session;
+
 
 
 class Category extends Thy
 {
-    public function index()
-    {
-        $view=new View();
-        return $view->fetch();
-    }
+
+    /**
+     * @api {post} /category/add 添加|更新分类的方法
+     * @apiName category_add
+     * @apiGroup Category
+     *
+     * @apiParam {String{0..200}} title 分类标题
+     * @apiParam {String{0..300}} img 图片列表用","隔开
+     * @apiParam {Number} pid 父id
+     * @apiParam {String{0..150}} keywords 关键词
+     * @apiParam {String{0..350}} description 描述
+     * @apiParam {String="text"} content 文章内容
+     * @apiParam {Number} type 分类类型,预留,暂不使用
+     * @apiParam {Number{0-9999}} sort 排序(desc)
+     * @apiParam {String} state 状态(on:off),显示:隐藏
+     *
+     *
+     * @apiSuccess (成功添加) {Number} insert_id 自增id
+     * @apiSuccess (成功添加) {Number} code 状态标识码
+     * @apiSuccess (成功添加) {String} message 状态信息
+     *
+     * @apiSuccess (成功更新) {Number} update_id 更新id
+     * @apiSuccess (成功更新) {Number} code 状态标识码
+     * @apiSuccess (成功更新) {String} message 状态信息
+     */
+    public function add(){
+        //获取整个传过来的表单文件
+        //此时相关文件图片内容已经入了缓存
+
+        //此为分类表处理,与article相比
+        //多:code,type
+        //少:time,click
+        $data=$_POST;
 
 
-    public function getData(){
-        //页数
-        $page=$_REQUEST['page'];
-        //每页数
-        $limit=$_REQUEST['limit'];
-        //总数
-        $total=$page*$limit-$limit;
+        //处理img
+        //1.遍历图片集,转入上传区
+        $img_list=explode(",",$_POST['img']);
+        foreach ($img_list as $value){
+            //首先判断缓存区是否存在此文件
+            $file = ROOT_PATH . 'public/uploads/temp/' . $value;
+            if (file_exists($file)) {
+                parent::move_file($value);
+            }
+        }
 
-        //获取id集
-//        $base=new Base();
-//        $ids=$base->getTypeID(13);
+        //处理content
+        //1.遍历content中的img,放入上传区,修改src路径
+        $content=$data['content'];
 
-        //获取文章信息
-        $data['data'] = db('type')->order(['order'=>'desc','id'=>'desc'])->limit("$total,$limit")->select();
-//        foreach ($data['data'] as $key => $value) {
-//            $pids=explode(",",$value['pid']);
-//            $data['data'][$key]['cat']='';
-//            if(count($pids)>1){
-//                foreach ($pids as $key2=>$value2){
-//                    $data['data'][$key]['cat'].=db('type')->where("`id`= $value2")->value('name')." , ";
-//                }
-//            }
-//            else{
-//                $data['data'][$key]['cat'] = db('type')->where("`id`= $pids[0] ")->value('name');
-//            }
-//
-//        }
+        $preg = '/<img.*?src=[\"|\']?(.*?)[\"|\']?\s.*?>/i';//正则获取所有图片路径
+        preg_match_all($preg,$content,$matches);//array[0]为img集,array[1]为src集
+        //遍历所有src路径进行转移图片
+        foreach ($matches[1] as $value){
+            //首先判断是否有匹配的文件
+            $filename=substr(strrchr($value,"temp"),5); //数组凭接获取:20190626\6159e602f3befeccd8f83ebcd74702b3.jpg
+            if($filename)
+                //接着判断缓存区是否已有有此文件
+                $file= ROOT_PATH . 'public/uploads/temp/'. $filename;
+            if (file_exists($file)) {
+                parent::move_file($filename);
+            }
+        }
 
-        $data['code'] = '0';
-        $data['msg'] = "分类列表数据";
-        $data['page'] = $page;
-        $data['limit'] = $limit;
-        $data['count'] = db('type')->order(['order'=>'desc','id'=>'desc'])->count();
+        //2.更改所有图片文件的src
+        $temp_path="http://cms-api.tt/public/uploads/temp/";
+        $formal_path="http://cms-api.tt/public/uploads/";
+        $content2=str_replace($temp_path,$formal_path,$content);
+
+        $data["content"]=$content2;
+
+        //判断是更新还是添加,id值不为0就是更新
+        if($data['id'] != 0){
+            //更新
+            $msg['update_id']=$data['id'];
+            unset($data->id);
+            db('type')->where('id ='.$msg['update_id'])->update($data);
+            $msg['message']= "更新成功";
+        }else{
+            //添加
+            unset($data->id);
+            $msg['insert_id']=db('type')->insertGetId($data);
+            //添加时,多了code要处理
+            //code是(父code+本id);
+            $p_code=db('type')->where("id = ".$data['pid'])->value("code");
+
+            $code=$p_code.$msg['insert_id'].",";
+            db('type')->where('id ='.$msg['insert_id'])->setField('code',$code);
+            $msg['message']= "添加成功";
+        }
+        $msg['code']= "200";
+
 
         return json($data);
-    }
-
-
-    //添加文章页面
-    public function add()
-    {
-        $view=new View();
-
-        $base=new Base();
-        $tree=$base->getTree(1);
-        $view->tree=$base->genOption($tree);
-
-        return $view->fetch();
-    }
-
-
-    //添加文章方法
-    public function addArticle(){
-        $article = new TypeModel;
-
-        //获取ajax传输的表单数据
-        $data=$_POST;
-
-
-        if($data['parent'] == ''){
-            return false;
-            exit;
-        }
-
-        if(isset($data['img1'])){
-            $this->moveFile($data['img1']);
-        }
-        if(isset($data['img2'])){
-            $this->moveFile($data['img2']);
-        }
-        if(isset($data['img3'])){
-            $this->moveFile($data['img3']);
-        }
-
-
-
-        $article->data($data);
-
-        // 过滤post数组中的非数据表字段数据
-        $article->save();
-
-        $id=$article->id;
-        $code['code']=$data['code'].$id.",";
-        $article->save($code,['id' => $id]);
 
     }
 
 
-    //修改文章页面
-    public function edit(){
-        if(isset($_GET["id"])){
-            $id=$_GET["id"];
-            $article=TypeModel::get($id);
+    /**
+     * @api {get} /category/get_single_category 获取单个分类的内容
+     * @apiName category_single
+     * @apiGroup Category
+     *
+     * @apiParam {Number} id 单个分类id
+     *
+     * @apiSuccess (成功返回) {Array} data 分类内容
+     * @apiSuccess (成功返回) {Number} code 状态标识码
+     * @apiSuccess (成功返回) {String} message 状态信息
+     *
+     */
+    public function get_single_category(){
+        $id=$_GET['id'];
 
-//            $article["pname"]=TypeModel::where('id',$article['pid'])->value('name');
+        $data['data']=db("type")->where("id = $id")->select()[0];
+        $data['code']="200";
+        $data['message']="获取成功";
 
+        return json($data);
 
-//            $pids=explode(",",$article['pid']);
-//            $article['pname']='';
-//            if(count($pids)>1){
-//                foreach ($pids as $key=>$value){
-//                    $article['pname'].=db('type')->where("`id`=$value")->value('name')." , ";
-//                }
-//            }
-//            else{
-//                $article['pname'] = db('type')->where("`id`=$pids[0]")->value('name');
-//            }
-            if ($article['parent']==0){
-                $article['pname']=TypeModel::where('id',0)->value("name");
-            }
-            else{
-                $article['pname']=TypeModel::where('id',$article['parent'])->value("name");
-            }
-
-
-            $view = new View();
-            $base=new Base();
-            $tree=$base->getTree(1);
-            $view->tree=$base->genOption($tree);
-            $view->assign('list',$article);
-            return $view->fetch();
-        }
     }
 
 
-    public function editArticle(){
-        $id=$_GET["id"];
+    /**
+     * @api {get} /category/del 删除分类的方法
+     * @apiName category_del
+     * @apiGroup Catogory
+     *
+     * @apiParam {String} id 需删除的分类id,可传多个值(1,2,3),以逗号分隔
+     *
+     * @apiSuccess (成功返回) {Number} count 删除分类的个数
+     * @apiSuccess (成功返回) {Number} code 状态标识码
+     * @apiSuccess (成功返回) {String} message 状态信息
+     */
+    public function del(){
+        $id=$_GET['id'];
 
-        $data=$_POST;
+        $data['count']=0;
 
-        $ori=TypeModel::get($id);
+        $id_arr=explode(",",$id);
 
-        if(isset($data['img1'])){
-            if ($ori["img1"]!=$data['img1']){ //判断图片有无更改
-                $this->moveFile($data['img1']);
-            }
+        foreach ($id_arr as $id_val){
+            //获取要删除的本身及子分类的id
+            $types=parent::get_type_id($id_val);
+
+            //删除本分类
+            $temp=db('type')->where("id in ($types)")->select();//返回删除的文章列表
+            //删除本身自带的Img
+            parent::del_imgs($temp);
+
+            //处理分类下文章的内容
+            $articles=db("article")->where("pid in ($types)")->select();//返回所要删除分类下的文章列表
+            //删除本身子分类的自带的Img
+            parent::del_imgs($articles);
+
+            $articles_count=db("article")->where("pid in ($types)")->delete();//返回删除的数目
+            $categorys_count=db('type')->where("id in ($types)")->delete();//返回删除的数目
+
+
+            $data['count'].=$articles_count;
+            $data['count'].=$categorys_count;
         }
-        if(isset($data['img2'])){
-            if ($ori["img2"]!=$data['img2']){ //判断图片有无更改
-                $this->moveFile($data['img2']);
-            }
-        }
-        if(isset($data['img3'])){
-            if ($ori["img3"]!=$data['img3']){ //判断图片有无更改
-                $this->moveFile($data['img3']);
-            }
-        }
-
-        if(isset($data['code'])){
-            $data['code']=$data['code'].$id.",";
-        }
 
 
-        $article = new TypeModel;
+        $data['code']="200";
+        $data['message']="删除成功";
 
-        $article->allowField(true)->save($data,['id' => $id]);
+        return json($data);
+
     }
 
-
-    public function test(){
-        $arrs=array("1","2","3","4");
-        $id="1";
-
-        $arr = array_merge(array_diff($arrs, array($id)));
-        var_dump($arr);
-    }
-
-
-    //删除信息
-    public function delArticle($id_single=''){
-        if($id_single!=''){
-            $id=$id_single;
-        }
-        else{
-            $id=$_REQUEST['id'];
-        }
-        $base=new Base();
-        $article = new ArticleModel;
-        $result=db('type')->where('id',$id)->delete();
-        $result2=db('article')->select();
-
-        $list=array();//更新列表
-
-        foreach ($result2 as $key=>$value){
-            $arrs=explode(",",$value['pid']);
-            if(in_array($id,$arrs)){//判断文章是否包含这个pid
-                if(count($arrs) == 1){//判断数组长度,1为独立pid,可删除
-                    $result=db('article')->where('id',$value['id'])->find();
-                    if($result['img1']!=''){
-                        $base->delete_img($result['img1']);
-                    }
-                    if($result['img2']!=''){
-                        $base->delete_img($result['img2']);
-                    }
-                    if($result['img3']!=''){
-                        $base->delete_img($result['img3']);
-                    }
-                    if($result['content']!=''){
-                        $base->delete_imgs($result['content']);
-                    }
-                    db('article')->where('id',$value['id'])->delete();
-                }
-                else{//判断数组长度,含复数的pid,清除本id
-                    $arr = array_merge(array_diff($arrs, array($id)));//删除数组中的本id元素,生成新pid
-                    $data['id']=$value['id'];
-                    $data['pid']=implode(",",$arr);
-                    array_push($list,$data);
-                }
-            }
-            $article->isUpdate()->saveAll($list);//对pid进行批量更新
-        }
-
-        return "ok";
-    }
-
-    //批量删除
-    public function delAllArticle(){
-        $id=$_REQUEST['id'];
-        $idArr=explode(",",$id);//将传过来的ids字符串转换为数组
-        foreach ($idArr as $key2=>$value2){
-            $this->delArticle($value2);
-        }
-        return 'ok';
-    }
 
 }
