@@ -158,6 +158,65 @@ class Base
         return json($data);
     }
 
+    /**
+     * @api {get} /base/type_tree_echarts 获取树状结构(echarts用)
+     * @apiName type_tree_echarts
+     * @apiGroup Base
+     * @apiParam {Number} id 树状结构最外层的id
+     *
+     * @apiSuccess (成功返回) {String} data 树状结构
+     * @apiSuccess (成功返回) {String} message 信息
+     * @apiSuccess (成功返回) {Number} code 状态标识码
+     * @apiSuccess (成功返回) {Number} count 所有文章数量
+     *
+     * @apiSuccessExample 样本数据:
+     *
+     */
+    public function type_tree_echarts(){
+        $id=$_GET["id"];
+
+        $types=Db::query("select id,pid,title as name from thy_type where code like '%".$id."%' order by sort desc,id desc");
+
+        //查询当前分类的文章数目
+        foreach ($types as $key=>$value){
+            $pids=$this->get_type_id($value['id']);
+            if($pids){
+                $count=db("article")->where("pid in ($pids)")->select();
+                $types[$key]["value"]=count($count);
+            }
+        }
+
+
+        //新数组以原数组的id为索引,进行遍历
+        foreach ($types as $value){
+            $items[$value['id']]=$value;
+        }
+
+        foreach ($items as $key=>$value){
+            //判断当前的父元素为索引的元素定义时,此元素为子元素
+            if(isset($items[$value['pid']])){
+                //当前元素就是父元素的子集
+                //$items[$value['parent']]['son'][],$tree[],$items[$key]
+                //三个变量用&绑在了一起,指向了同一个地址
+                //这里不用$value的原因是每个$value都有不同地址,最终三者的值为最后一个元素的值
+                $items[$value['pid']]['children'][] = &$items[$key];
+            }else{
+                //如果已定义的话,说明是父级元素,直接push到tree
+                $tree[] = &$items[$key];
+                //父元素清除value值
+
+            }
+        }
+
+
+        $data["data"]=$tree;
+        $data["count"]=count(db("article")->select());
+        $data["message"]="返回成功";
+        $data["code"]=200;
+
+        return json($data);
+    }
+
 
     /**
      * @api {Method} /base/move_file  文件移动
@@ -213,7 +272,7 @@ class Base
 
 
     /**
-     * @api {METHOD} /base/get_type_id 获取子类别ID和自身
+     * @api {METHOD} /base/get_type_id 获取子类别id包含本身id
      * @apiName get_type_id
      * @apiGroup Base
      *
@@ -222,17 +281,42 @@ class Base
      * @apiSuccess (返回成功) {String} id字符串"15,16,12"
      */
     function get_type_id($id) {
-        //返回$id的子类别ID和自身
-        $pid= Db::query("select id from thy_type where code like '%,".$id.",%'");
-        $nums = '';
-        foreach ($pid as $v) {
-            $nums .= $v['id'] . ',';
+        $pids= Db::query("select id from thy_type where code like '%,".$id.",%'");
+        if(count($pids)>0){
+            foreach ($pids as $value) {
+                $ids[]=$value['id'];
+            }
+            return implode(",",$ids);
         }
-        return rtrim($nums, ',');
     }
 
 
-    //获取文件夹大小
+    /**
+     * @api {METHOD} /base/get_temp_size 获取temp目录的大小(mb)
+     * @apiName get_temp_size
+     * @apiGroup Base
+     *
+     * @apiSuccess (返回成功) {Number} 0.54单位(mb)
+     */
+    public function get_temp_size(){
+        $view=new View();
+        //获取图片缓存的大小:mb
+        $dirSize=$this->dir_size(ROOT_PATH . 'public/uploads/temp')/1024/1024;
+        //向上取整,两位小数
+        $dirSize=round($dirSize,2);
+        return json($dirSize);
+    }
+
+
+    /**
+     * @api {METHOD} /base/dir_size 获取文件夹大小(内部)
+     * @apiName dir_size
+     * @apiGroup Base
+     *
+     * @apiParam {String} 文件夹的路径
+     *
+     * @apiSuccess (返回成功) {Number} 0.54单位(mb)
+     */
     public function dir_size($dir){
         $dh = opendir($dir);             //打开目录，返回一个目录流
         $size = 0;      //初始大小为0
@@ -250,19 +334,34 @@ class Base
         return $size;               //返回大小
     }
 
-    //清除缓存方法
+
+    /**
+     * @api {METHOD} /base/temp_clear 删除缓存文件夹
+     * @apiName temp_clear
+     * @apiGroup Base
+     *
+     * @apiSuccess (返回成功) {String} success|error
+     *
+     */
     public function temp_clear(){
         $result=$this->dir_del(ROOT_PATH . 'public/uploads/temp/');
 
         if($result){
-            return json("ok");
+            return json("success");
         }
         else{
-            return json("no");
+            return json("error");
         }
     }
 
-    //文件删除方法
+    /**
+     * @api {METHOD} /base/dir_del 删除文件夹(内部)
+     * @apiName dir_del
+     * @apiGroup Base
+     *
+     * @apiParam {String} 文件夹的路径
+     *
+     */
     public function dir_del($path){
         //如果是目录则继续
         if(is_dir($path)){
@@ -286,18 +385,6 @@ class Base
         }
     }
 
-    //默认执行方法
-    public function need_assign(){
-        $view=new View();
-        //获取图片缓存的大小:mb
-        $dirSize=$this->dir_size(ROOT_PATH . 'public/uploads/temp')/1024/1024;
-        //向上取整,两位小数
-        $dirSize=round($dirSize,2);
-        $view->share("size",$dirSize);
-    }
-
-
-
 
     //添加文章内容图片路径
     function add_imgs_url($content){
@@ -317,26 +404,6 @@ class Base
         return $content;
 
     }
-    public function getTypeID($id) {
-        if (!$id) return false;
-
-        if ($id > 0 && $id < 4) {
-            $pid = Db::query("select * from thy_type where code like '$id,%'");
-
-        } else {
-            $pid = Db::query("select * from thy_type where code like '%,$id,%'");
-        }
-
-        //文章 or 产品 or 人才 的PID
-        $nums = '';
-        foreach ($pid as $v) {
-            $nums .= $v['id'] . ',';
-        }
-
-        return rtrim($nums, ',');
-    }
-
-
 
 
     //获取分类集(引用方法)

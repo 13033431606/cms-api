@@ -27,7 +27,7 @@ class Article extends Base
      */
     public function index()
     {
-        $id= $_GET['id'];
+        $id= parent::get_type_id($_GET['id']);
         $page= $_GET['page'];//页码
         $num= $_GET['num'];//每页个数
         $total= ($page-1)*$num;
@@ -36,11 +36,13 @@ class Article extends Base
             //$data["data"]= db("article")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
             //tp自带函数助手无目标取值,所以用了原生写法;
             $data["data"]= Db::query("SELECT id,sort,title,pid,img,time FROM thy_article ORDER BY sort DESC, id DESC LIMIT "."$total,$num");
+            $data["count"]= count(db("article")->select());
         }
         else{
             //$data["data"]= db("article")->where("pid in ($id)")->order(['order'=>'desc','id'=>'desc'])->limit("$total,$num")->select();
             //原因同上
             $data["data"]= Db::query("SELECT id,sort,title,pid,img,time FROM thy_article where pid in (".$id.") ORDER BY sort DESC, id DESC LIMIT "."$total,$num");
+            $data["count"]= count(db("article")->where("pid in ($id)")->select());
         }
 
         //基于pid查询分类名
@@ -49,7 +51,7 @@ class Article extends Base
             $data["data"][$key]["pname"]=$pname;
         }
 
-        $data["count"]= count(db("article")->select());
+
         $data['code']= "200";
         $data['message']= "返回成功";
 
