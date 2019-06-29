@@ -11,6 +11,9 @@ use think\Db;
 
 class Base
 {
+    public function check_login(){
+        return json(session('user'));
+    }
 
     /**
      * @api {post} /base/upload 文件上传
@@ -301,10 +304,10 @@ class Base
     public function get_temp_size(){
         $view=new View();
         //获取图片缓存的大小:mb
-        $dirSize=$this->dir_size(ROOT_PATH . 'public/uploads/temp')/1024/1024;
+        $temp_size=$this->dir_size(ROOT_PATH . 'public/uploads/temp')/1024/1024;
         //向上取整,两位小数
-        $dirSize=round($dirSize,2);
-        return json($dirSize);
+        $temp_size=round($temp_size,2);
+        return json($temp_size);
     }
 
 
@@ -384,6 +387,7 @@ class Base
             }
         }
     }
+
 
 
     //添加文章内容图片路径

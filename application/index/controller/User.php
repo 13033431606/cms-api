@@ -5,11 +5,10 @@ header('Access-Control-Allow-Origin:*');
 header("Content-type:app/json");
 
 use think\Db;
-use think\Session;
+
 
 class User extends Base
 {
-
 
     public function user_login(){
         $data=$_POST['data'];
@@ -28,10 +27,13 @@ class User extends Base
                 $msg["data"]["username"]=$user_data["username"];
                 $msg["code"]=200;
 
-                //创建用户的登录session
+                //创建用户的登录cache
                 $user_session['id']=$user_data["id"];
                 $user_session['token']=$msg["data"]["token"];
-                session('user', $user_session);
+
+                //设置登录缓存,周期一个礼拜
+                cache('user'.$user_session['id'], $user_session, 3600*24*7);
+
             }
             else{
                 $msg["code"]=502;
