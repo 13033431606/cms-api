@@ -87,7 +87,10 @@ class Category extends Base
             //更新
             $msg['update_id']=$data['id'];
             unset($data->id);
+            $p_code=db('type')->where("id = ".$data['pid'])->value("code");
+            $data['code']=$p_code.$msg['update_id'].",";
             db('type')->where('id ='.$msg['update_id'])->update($data);
+
             $msg['message']= "更新成功";
             parent::log("更新了分类 : ".$data['title'],$data['user_id'],$data['id'],"修改");
         }else{
