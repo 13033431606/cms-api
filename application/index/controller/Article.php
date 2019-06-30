@@ -131,11 +131,13 @@ class Article extends Base
             unset($data->id);
             db('article')->where('id ='.$msg['update_id'])->update($data);
             $msg['message']= "更新成功";
+            parent::log("更新了文章 : ".$data['title'],$data['user_id'],$data['id'],"修改");
         }else{
             //添加
             unset($data->id);
             $msg['insert_id']=db('article')->insertGetId($data);
             $msg['message']= "添加成功";
+            parent::log("添加了文章 : ".$data['title'],$data['user_id'],$msg['insert_id'],"添加");
         }
         $msg['code']= "200";
 
@@ -166,7 +168,6 @@ class Article extends Base
         $data['count']=db('article')->where("id in ($id)")->delete();//返回删除的数目
         $data['code']="200";
         $data['message']="删除成功";
-
 
     }
 

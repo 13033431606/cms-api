@@ -11,8 +11,17 @@ use think\Db;
 
 class Base
 {
-    public function check_login(){
-        return json(session('user'));
+
+
+    /**
+     * 添加日志的方法
+     */
+    public function log($title,$userid,$articleid,$type){
+        $data['title']=$title;
+        $data['user_id']=$userid;
+        $data['article_id']=$articleid;
+        $data['type']=$type;
+        db('log')->insert($data);
     }
 
     /**

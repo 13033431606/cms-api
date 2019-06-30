@@ -9,7 +9,18 @@ use think\Db;
 
 class User extends Base
 {
-
+    /**
+     * @api {post} /user/user_login
+     * @apiName user_login
+     * @apiGroup User
+     *
+     * @apiParam {String} username 提交的用户名
+     * @apiParam {String} password 提交的密码
+     *
+     * @apiSuccess (成功添加) {Array}  data 包含用户的id,name和token
+     * @apiSuccess (成功添加) {Number} code 状态标识码
+     * @apiSuccess (成功添加) {String} message 状态信息
+     */
     public function user_login(){
         $data=$_POST['data'];
 

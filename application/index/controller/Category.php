@@ -89,6 +89,7 @@ class Category extends Base
             unset($data->id);
             db('type')->where('id ='.$msg['update_id'])->update($data);
             $msg['message']= "更新成功";
+            parent::log("更新了分类 : ".$data['title'],$data['user_id'],$data['id'],"修改");
         }else{
             //添加
             unset($data->id);
@@ -100,6 +101,7 @@ class Category extends Base
             $code=$p_code.$msg['insert_id'].",";
             db('type')->where('id ='.$msg['insert_id'])->setField('code',$code);
             $msg['message']= "添加成功";
+            parent::log("添加了分类 : ".$data['title'],$data['user_id'],$data['id'],"添加");
         }
         $msg['code']= "200";
 
